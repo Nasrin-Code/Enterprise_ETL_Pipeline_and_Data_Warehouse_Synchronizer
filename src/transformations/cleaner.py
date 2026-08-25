@@ -18,5 +18,6 @@ def clean_stripe_data(records):
 
     # Convert Stripe's smallest currency unit to standard amount
     df["amount"] = pd.to_numeric(df["amount"], errors = "coerce")
+    df["amount"] = df["amount"]/100
 
     return df
