@@ -25,9 +25,6 @@ The pipeline supports:
 Stripe API
     |
     v
-Salesforce API
-    |
-    v
 Extraction
     |
     v
@@ -35,11 +32,11 @@ Transformation
    / \
   v   v
 Cleaning  Mapping
-   \ /
-    v
-Validation
-    |
-    v
+   \     /
+    v   v
+   Validation
+       |
+       v
 Data Warehouse
 
 ## Technologies Used
@@ -59,29 +56,29 @@ Data Warehouse
 
 Enterprise_ETL_Pipeline_and_Data_Warehouse_Synchronizer/
 |
-├── src/
-│   ├── extractors/
-│   │   ├── stripe.py
-│   │   └── salesforce.py
-│   │
-│   ├── transformations/
-│   │   ├── cleaner.py
-│   │   └── mapper.py
-│   │
-│   ├── utils/
-│   │   ├── retry.py
-│   │   └── s3_storage.py
-│   │
-│   ├── config.py
-│   └── models.py
-│
-├── tests/
-│   ├── test_cleaner.py
-│   └── test_mapper.py
-│
-├── .gitignore
-├── requirements.txt
-└── README.md
++-- src/
+|   +-- extractors/
+|   |   +-- stripe.py
+|   |   +-- salesforce.py
+|   |
+|   +-- transformations/
+|   |   +-- cleaner.py
+|   |   +-- mapper.py
+|   |
+|   +-- utils/
+|   |   +-- retry.py
+|   |   +-- s3_storage.py
+|   |
+|   +-- config.py
+|   +-- models.py
+|
++-- tests/
+|   +-- test_cleaner.py
+|   +-- test_mapper.py
+|
++-- .gitignore
++-- requirements.txt
++-- README.md
 
 ## Implemented Features
 
