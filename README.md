@@ -1,4 +1,3 @@
-````markdown
 # Enterprise ETL Pipeline and Data Warehouse Synchronizer
 
 ## Project Overview
@@ -24,27 +23,25 @@ The pipeline supports:
 ## ETL Architecture
 
 ```text
-Stripe API              Salesforce API
-     |                        |
-     +-----------+------------+
-                 |
-                 v
-            Extraction
-                 |
-                 v
-          Transformation
-             /       \
-            v         v
-        Cleaning    Mapping
-             \       /
-              \     /
-                v
-            Validation
-                 |
-                 v
-          Data Warehouse
-````
-
+Stripe API ───────┐
+                  │
+Salesforce API ───┘
+          │
+          ▼
+      Extraction
+          │
+          ▼
+    Transformation
+       /       \
+      ▼         ▼
+  Cleaning    Mapping
+       \       /
+          ▼
+      Validation
+          │
+          ▼
+    Data Warehouse
+    
 ## Technologies Used
 
 * Python
