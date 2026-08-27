@@ -1,3 +1,6 @@
+Replace **only the beginning of your `README.md`** with this:
+
+````markdown
 # Enterprise ETL Pipeline and Data Warehouse Synchronizer
 
 ## Project Overview
@@ -41,7 +44,8 @@ Salesforce API ───┘
           │
           ▼
     Data Warehouse
-    
+````
+
 ## Technologies Used
 
 * Python
