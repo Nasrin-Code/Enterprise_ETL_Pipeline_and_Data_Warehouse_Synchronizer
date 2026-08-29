@@ -6,3 +6,4 @@ boto3==1.43.75
 pytest==9.1.1
 SQLAlchemy==2.0.52
 pandas==3.0.5
+psycopg==3.3.4
