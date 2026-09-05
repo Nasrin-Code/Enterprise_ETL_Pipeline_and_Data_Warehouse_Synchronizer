@@ -11,3 +11,10 @@ class StripeTransaction(Base):
     currency = Column(String)
     created_at = Column(DateTime)
     status = Column(String)
+
+class SalesforceCustomer(Base):
+    __tablename__ = "salesforce_customers"
+
+    customer_id = Column(String, primary_key=True)
+    name = Column(String)
+    email = Column(String)

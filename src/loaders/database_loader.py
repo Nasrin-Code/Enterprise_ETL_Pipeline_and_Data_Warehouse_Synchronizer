@@ -1,7 +1,7 @@
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import SessionLocal
-from src.warehouse_models import StripeTransaction
+from src.warehouse_models import StripeTransaction, SalesforceCustomer
 
 
 def upsert_stripe_transaction(record):
@@ -23,6 +23,30 @@ def upsert_stripe_transaction(record):
                 "currency": statement.excluded.currency,
                 "created_at": statement.excluded.created_at,
                 "status": statement.excluded.status,
+            },
+        )
+
+        session.execute(statement)
+        session.commit()
+
+    finally:
+        session.close()
+
+def upsert_salesforce_customer(record):
+    session = SessionLocal()
+
+    try:
+        statement = insert(SalesforceCustomer).values(
+            customer_id=record["customer_id"],
+            name=record["name"],
+            email=record["email"],
+        )
+
+        statement = statement.on_conflict_do_update(
+            index_elements=[SalesforceCustomer.customer_id],
+            set_={
+                "name": statement.excluded.name,
+                "email": statement.excluded.email,
             },
         )
 
