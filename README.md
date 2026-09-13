@@ -2,45 +2,87 @@
 
 ## Project Overview
 
-A Python-based ETL pipeline that extracts business data from external APIs, cleans and transforms the data into a unified structure, validates the data, and prepares it for loading into a centralized data warehouse.
+A Python-based enterprise-style ETL pipeline that extracts business data from multiple external APIs, cleans and transforms the data into a unified structure, validates the data, and loads it into a centralized PostgreSQL data warehouse.
+
+The project was developed according to the Zaalima Development Python Development Internship - Project 1 guideline.
 
 ## Project Objective
 
-The project demonstrates an enterprise-style ETL workflow using multiple API data sources.
+The objective of this project is to demonstrate a resilient and automated data-engineering pipeline capable of:
 
-The pipeline supports:
-
-- Extracting data from Stripe
-- Extracting data from Salesforce
+- Extracting data from multiple APIs
 - Handling API pagination
-- Handling API rate limits with retry logic
-- Cleaning and standardizing Stripe data
-- Mapping different API structures into unified fields
-- Validating data using Pydantic
-- Testing transformation logic using Pytest
+- Handling API rate limits and retries
+- Cleaning and standardizing source data
+- Mapping different API structures into a unified schema
+- Validating structured data using Pydantic
+- Loading data into PostgreSQL
+- Synchronizing records using PostgreSQL upsert logic
+- Testing ETL components using Pytest
+- Orchestrating ETL workflows using Apache Airflow
+- Sending email notifications when pipeline failures occur
+- Containerizing the application using Docker
+- Running automated CI tests using GitHub Actions
 - Preparing raw JSON storage using AWS S3
 
 ## ETL Architecture
 
 ```text
-Stripe API ───────┐
-                  │
-Salesforce API ───┘
-          │
-          ▼
-      Extraction
-          │
-          ▼
-    Transformation
-       /       \
-      ▼         ▼
-  Cleaning    Mapping
-       \       /
-          ▼
-      Validation
-          │
-          ▼
-    Data Warehouse
+                    +-----------------+
+                    |    Stripe API   |
+                    +--------+--------+
+                             |
+                             |
+                    +--------v--------+
+                    |   Extraction    |
+                    +--------+--------+
+                             |
+                             v
+                    +-----------------+
+                    |     Cleaning    |
+                    +--------+--------+
+                             |
+                             v
+                    +-----------------+
+                    | Transformation  |
+                    |    / Mapping    |
+                    +--------+--------+
+                             |
+                             v
+                    +-----------------+
+                    |    Validation   |
+                    +--------+--------+
+                             |
+                             v
+                    +-----------------+
+                    |   SQLAlchemy    |
+                    |   PostgreSQL    |
+                    +--------+--------+
+                             |
+                             v
+                    +-----------------+
+                    |  Data Warehouse |
+                    +-----------------+
+
+
+                    +-----------------+
+                    | Salesforce API  |
+                    +--------+--------+
+                             |
+                             v
+                       Extraction
+                             |
+                             v
+                     Transformation
+                             |
+                             v
+                       Validation
+                             |
+                             v
+                       PostgreSQL
+```
+
+Apache Airflow is used to orchestrate the ETL workflow.
 
 ## Technologies Used
 
@@ -54,52 +96,91 @@ Salesforce API ───┘
 * Pytest
 * SQLAlchemy
 * PostgreSQL
+* Apache Airflow
+* Docker
+* GitHub Actions
+* Gmail SMTP
 
 ## Project Structure
 
 ```text
 Enterprise_ETL_Pipeline_and_Data_Warehouse_Synchronizer/
 |
-├── src/
-│   ├── extractors/
-│   │   ├── stripe.py
-│   │   └── salesforce.py
-│   │
-│   ├── transformations/
-│   │   ├── cleaner.py
-│   │   └── mapper.py
-│   │
-│   ├── utils/
-│   │   ├── retry.py
-│   │   └── s3_storage.py
-│   │
-│   ├── config.py
-│   └── models.py
-│
-├── tests/
-│   ├── test_cleaner.py
-│   └── test_mapper.py
-│
-├── .gitignore
-├── requirements.txt
-└── README.md
++-- src/
+|   +-- extractors/
+|   |   +-- stripe.py
+|   |   +-- salesforce.py
+|   |
+|   +-- transformations/
+|   |   +-- cleaner.py
+|   |   +-- mapper.py
+|   |
+|   +-- loaders/
+|   |   +-- database_loader.py
+|   |
+|   +-- utils/
+|   |   +-- retry.py
+|   |   +-- s3_storage.py
+|   |
+|   +-- config.py
+|   +-- database.py
+|   +-- models.py
+|   +-- warehouse_models.py
+|
++-- tests/
+|   +-- test_cleaner.py
+|   +-- test_mapper.py
+|   +-- test_etl_pipeline.py
+|
++-- .github/
+|   +-- workflows/
+|       +-- ci.yml
+|
++-- Dockerfile
++-- pytest.ini
++-- requirements.txt
++-- README.md
++-- .gitignore
 ```
 
-## Implemented Features
+Airflow DAGs are maintained in the Airflow DAG directory:
 
-### 1. Stripe Data Extraction
+```text
+airflow/
+|
++-- dags/
+    +-- stripe_etl_dag.py
+    +-- salesforce_etl_dag.py
+    +-- utils/
+        +-- notifications.py
+```
+
+# Week 1 - API Integration and Data Extraction
+
+## 1. Pydantic Configuration
+
+Pydantic Settings is used to load configuration from environment variables and the `.env` file.
+
+The configuration contains:
+
+* STRIPE_API_KEY
+* DATABASE_URL
+
+Sensitive values are kept outside the source code and `.env` is excluded from Git.
+
+## 2. Stripe Data Extraction
 
 The `StripeExtractor` retrieves Payment Intent data from the Stripe API.
 
 Features include:
 
 * Bearer-token authentication
-* API requests using Requests
+* HTTP requests using Requests
 * Cursor-based pagination
 * Collection of records across multiple pages
-* Rate-limit retry handling
+* Rate-limit handling
 
-### 2. Salesforce Data Extraction
+## 3. Salesforce Data Extraction
 
 The `SalesforceExtractor` retrieves Salesforce records using SOQL queries.
 
@@ -109,27 +190,31 @@ Features include:
 * SOQL query support
 * Salesforce pagination using `nextRecordsUrl`
 * Collection of records across multiple pages
-* Rate-limit retry handling
+* Rate-limit handling
 
-### 3. Rate-Limit Handling
+## 4. API Rate-Limit Handling
 
-The project uses Tenacity to retry requests when an API returns HTTP `429`.
+Tenacity is used to handle API rate limiting.
 
-The retry configuration:
+When an API returns HTTP `429`, the pipeline raises a custom `RateLimitError` and retries the request.
 
-* Retries up to 3 attempts
-* Uses exponential backoff
-* Retries specifically for the custom `RateLimitError`
+The retry configuration includes:
 
-### 4. Stripe Data Cleaning
+* Maximum of 3 attempts
+* Exponential backoff
+* Retry specifically for rate-limit errors
 
-The `clean_stripe_data()` function performs the following transformations:
+# Week 2 - Data Transformation and Validation
 
-* Handles missing amounts
-* Converts Unix timestamps to datetime values
-* Converts currency codes to uppercase
-* Converts amount values to numeric values
-* Converts Stripe's smallest currency unit to the standard amount
+## 5. Stripe Data Cleaning
+
+The `clean_stripe_data()` function performs:
+
+* Missing amount handling
+* Unix timestamp conversion
+* Currency standardization
+* Numeric amount conversion
+* Conversion from Stripe's smallest currency unit to standard currency amount
 
 Example:
 
@@ -138,11 +223,13 @@ Example:
 usd  -> USD
 ```
 
-### 5. Unified API Field Mapping
+## 6. Unified API Field Mapping
 
-The project maps different API field names into a common internal structure.
+Different APIs use different field names.
 
-#### Stripe
+The pipeline maps them into a common internal structure.
+
+### Stripe
 
 ```text
 id       -> record_id
@@ -152,7 +239,7 @@ created  -> created_at
 status   -> status
 ```
 
-#### Salesforce
+### Salesforce
 
 ```text
 Id       -> customer_id
@@ -160,11 +247,11 @@ Name     -> name
 Email    -> email
 ```
 
-### 6. Pydantic Validation
+This allows downstream processing to work with standardized fields.
 
-Pydantic models are used to define and validate expected data structures.
+## 7. Pydantic Validation
 
-The customer model contains:
+Pydantic models define the expected structure of customer data.
 
 ```text
 customer_id -> string
@@ -172,11 +259,13 @@ name        -> string
 email       -> string
 ```
 
-### 7. Unit Testing
+This provides structured validation before data is loaded into the warehouse.
 
-Pytest is used to validate transformation and mapping logic.
+## 8. Automated Testing
 
-Current tests cover:
+Pytest is used to test transformation, mapping, and end-to-end ETL functionality.
+
+Tests cover:
 
 * Missing amount handling
 * Datetime conversion
@@ -184,82 +273,332 @@ Current tests cover:
 * Amount conversion
 * Stripe field mapping
 * Salesforce field mapping
+* End-to-end Stripe ETL flow
 
 Current test result:
 
 ```text
-6 passed
+7 passed
 ```
 
-Run all tests with:
+Run the test suite with:
 
 ```powershell
 python -m pytest tests
 ```
 
-## Configuration
+# Week 3 - Data Warehouse and Synchronization
 
-Sensitive configuration is stored using environment variables and `.env`.
+## 9. PostgreSQL Data Warehouse
 
-The `.env` file is excluded from Git using `.gitignore`.
+PostgreSQL is used as the local development data warehouse.
 
-API credentials should never be committed to the repository.
-
-## AWS S3 Raw Data Storage
-
-The project contains an S3 storage utility using Boto3 for uploading raw JSON data.
-
-The implementation uses:
-
-```text
-boto3.client("s3")
-```
-
-and:
-
-```text
-put_object()
-```
-
-The actual AWS S3 upload is currently pending because the AWS account activation/customer verification process is still incomplete.
-
-## Data Warehouse
-
-PostgreSQL has been configured locally as the current development data warehouse.
-
-The project database is:
+Database:
 
 ```text
 etl_warehouse
 ```
 
-SQLAlchemy has been added as the Python database abstraction layer.
+SQLAlchemy provides the Python database abstraction layer.
 
-The SQLAlchemy-to-PostgreSQL connection and warehouse loading implementation are part of the Week 3 development phase.
+The database connection is configured using:
 
-## Current Project Status
+```text
+DATABASE_URL
+```
 
-### Completed
+The connection URL contains the PostgreSQL database type, driver, username, password, host, port, and database name.
 
-* Project setup
-* Pydantic configuration
-* Stripe extraction
-* Salesforce extraction
-* API pagination
-* Rate-limit retry handling
-* Pandas data cleaning
-* Unified API field mapping
-* Pydantic customer validation
-* Pytest transformation tests
-* PostgreSQL database setup
-* SQLAlchemy dependency configuration
+## 10. SQLAlchemy Warehouse Models
 
-### Pending / Blocked
+The project defines warehouse models for Stripe transactions and Salesforce customers.
 
-* Actual AWS S3 raw JSON upload is blocked by AWS account activation.
-* SQLAlchemy database connection and data loading are part of the next development phase.
+### Stripe Transactions
 
-## Testing
+```text
+Table: stripe_transactions
+
+Columns:
+- record_id
+- amount
+- currency
+- created_at
+- status
+```
+
+### Salesforce Customers
+
+```text
+Table: salesforce_customers
+
+Columns:
+- customer_id
+- name
+- email
+```
+
+Primary keys are used to uniquely identify records.
+
+## 11. Database Loading
+
+The database loader uses SQLAlchemy and PostgreSQL to load transformed records into the warehouse.
+
+The loader supports:
+
+* INSERT operations for new records
+* UPDATE operations for existing records
+* PostgreSQL conflict handling
+* Transaction commits
+* Database session cleanup
+
+## 12. Upsert Synchronization
+
+The pipeline uses PostgreSQL upsert logic.
+
+Upsert means:
+
+```text
+New record
+    |
+    +--> INSERT
+
+Existing record
+    |
+    +--> UPDATE
+```
+
+Stripe records use `record_id` as the primary and conflict-detection field.
+
+Salesforce records use `customer_id` as the primary and conflict-detection field.
+
+This prevents duplicate records and allows existing warehouse records to be synchronized with incoming data.
+
+## 13. End-to-End ETL Testing
+
+The project includes an end-to-end Stripe ETL test covering:
+
+```text
+Raw Stripe-style data
+        |
+        v
+     Cleaning
+        |
+        v
+      Mapping
+        |
+        v
+Validation / Assertions
+        |
+        v
+Database Upsert
+        |
+        v
+   PostgreSQL
+```
+
+The test verifies important transformations such as:
+
+```text
+2500 -> 25.0
+usd  -> USD
+id   -> record_id
+```
+
+# Week 4 - Orchestration, Monitoring and Deployment
+
+## 14. Apache Airflow
+
+Apache Airflow is used to orchestrate the ETL workflow.
+
+The project contains:
+
+```text
+stripe_etl_dag.py
+salesforce_etl_dag.py
+```
+
+The Stripe DAG follows:
+
+```text
+Extract
+   |
+   v
+Clean
+   |
+   v
+Transform
+   |
+   v
+Load
+```
+
+The DAG is configured with:
+
+```text
+Schedule: @daily
+Catchup: False
+```
+
+Airflow manages task dependencies and execution scheduling.
+
+The current Stripe demonstration DAG uses sample Stripe records because live Stripe API credentials were not available for the demonstration environment.
+
+## 15. Failure Monitoring and Email Alerts
+
+An Airflow failure callback is implemented using:
+
+```text
+notify_failure()
+```
+
+When a configured ETL task fails:
+
+```text
+Airflow Task Failure
+        |
+        v
+Failure Callback
+        |
+        v
+notify_failure()
+        |
+        v
+Gmail SMTP
+        |
+        v
+Email Alert
+```
+
+The alert contains:
+
+* DAG ID
+* Task ID
+* Logical execution date/time
+
+Example subject:
+
+```text
+ETL Pipeline Failed: stripe_etl_pipeline
+```
+
+The failure notification workflow has been tested successfully.
+
+## 16. Docker
+
+The project is containerized using Docker.
+
+The Docker image:
+
+* Uses Python 3.12
+* Installs project dependencies
+* Copies source code
+* Copies tests
+* Runs the Pytest test suite
+
+Docker provides a reproducible application environment.
+
+The Docker image has been successfully built and tested.
+
+## 17. Continuous Integration - GitHub Actions
+
+GitHub Actions is used for Continuous Integration.
+
+The CI workflow follows:
+
+```text
+Git Push / Pull Request
+          |
+          v
+   GitHub Actions
+          |
+          v
+    Build Docker Image
+          |
+          v
+ Start PostgreSQL Service
+          |
+          v
+       Run Tests
+          |
+          v
+       Pass / Fail
+```
+
+The CI workflow automatically:
+
+1. Checks out the repository
+2. Starts a PostgreSQL service
+3. Builds the Docker image
+4. Runs the project's Pytest suite
+5. Reports the test result
+
+The latest CI run completed successfully.
+
+### CI and CD
+
+The implemented workflow demonstrates the Continuous Integration portion of CI/CD.
+
+The current project does not claim production deployment automation.
+
+# AWS S3 Raw Data Storage
+
+The project includes an AWS S3 storage utility using Boto3 for raw JSON storage.
+
+The implementation uses:
+
+```python
+boto3.client("s3")
+```
+
+and:
+
+```python
+put_object()
+```
+
+The intended raw-data architecture is:
+
+```text
+External API
+     |
+     v
+Raw JSON
+     |
+     v
+AWS S3
+     |
+     v
+Transformation
+     |
+     v
+Data Warehouse
+```
+
+## Current AWS S3 Status
+
+The S3 utility has been implemented, but the live AWS S3 upload has not been executed because AWS account activation is still pending.
+
+Therefore, live AWS S3 upload is not claimed as completed.
+
+# Security
+
+Sensitive credentials are not stored directly in source code.
+
+Environment variables and `.env` are used for sensitive configuration.
+
+The `.env` file is excluded from Git.
+
+Sensitive configuration includes:
+
+```text
+STRIPE_API_KEY
+DATABASE_URL
+SMTP credentials
+```
+
+Credentials should never be committed to the repository.
+
+# Testing
 
 Run the complete test suite:
 
@@ -267,36 +606,139 @@ Run the complete test suite:
 python -m pytest tests
 ```
 
-Expected result:
+Current result:
 
 ```text
-6 passed
+7 passed
 ```
 
-## Security
+The same test suite is also executed inside the Docker and GitHub Actions CI workflow.
 
-The project does not store API credentials directly in source code.
+# Project Status
 
-Sensitive configuration should remain in `.env`, which is excluded from version control.
+## Completed
 
-## Project Development Status
+* Project setup
+* Environment-based configuration
+* Pydantic Settings
+* Stripe extraction implementation
+* Salesforce extraction implementation
+* API pagination
+* Rate-limit handling
+* Tenacity retry logic
+* Pandas data cleaning
+* Unified API field mapping
+* Pydantic validation
+* Pytest unit tests
+* End-to-end ETL test
+* PostgreSQL data warehouse
+* SQLAlchemy database integration
+* Warehouse models
+* Database loading
+* PostgreSQL upsert synchronization
+* Apache Airflow DAGs
+* Daily ETL scheduling
+* Airflow failure callback
+* Gmail email failure notification
+* Docker containerization
+* GitHub Actions CI
+* Automated test execution
 
-The project is being developed incrementally according to the ETL project timeline:
+## Pending / Blocked
+
+* Live AWS S3 raw JSON upload
+
+The S3 utility is implemented, but the live upload is blocked by AWS account activation.
+
+# Final ETL Workflow
 
 ```text
-Extraction
-    |
-    v
-Transformation
-    |
-    v
-Validation
-    |
-    v
-Data Warehouse Connection
-    |
-    v
-Incremental Loading
-    |
-    v
-End-to-End ETL
+                    +----------------+
+                    |   Stripe API   |
+                    +-------+--------+
+                            |
+                            v
+                    +----------------+
+                    | Salesforce API  |
+                    +-------+--------+
+                            |
+                            v
+                       Extraction
+                            |
+                            v
+                  Cleaning / Mapping
+                            |
+                            v
+                       Validation
+                            |
+                            v
+                  SQLAlchemy Layer
+                            |
+                            v
+                       PostgreSQL
+                            |
+                            v
+                    Data Warehouse
+                            |
+                            v
+                    Upsert / Load
+```
+
+## Orchestration and Operations
+
+```text
+                 Apache Airflow
+                       |
+                       v
+                Daily Scheduling
+                       |
+                       v
+                 ETL Orchestration
+                       |
+                       v
+                Failure Callback
+                       |
+                       v
+                  Email Alert
+
+                      Docker
+                        |
+                        v
+              Reproducible Environment
+                        |
+                        v
+                 GitHub Actions
+                        |
+                        v
+                Automated Testing
+```
+
+# Project Development Timeline
+
+The project was developed incrementally according to the internship ETL project timeline.
+
+```text
+Week 1
+API Integration and Data Extraction
+        |
+        v
+Week 2
+Data Transformation and Validation
+        |
+        v
+Week 3
+Data Warehouse and Synchronization
+        |
+        v
+Week 4
+Orchestration, Monitoring and Deployment
+```
+
+# Conclusion
+
+This project demonstrates an enterprise-style ETL workflow that integrates multiple API sources, handles pagination and API rate limits, cleans and standardizes data, validates records, loads data into PostgreSQL, synchronizes records using upsert logic, orchestrates workflows using Airflow, monitors failures through email notifications, packages the application with Docker, and validates the application through GitHub Actions CI.
+
+The AWS S3 raw JSON storage component is implemented but live upload remains blocked by AWS account activation.
+
+```
+```
